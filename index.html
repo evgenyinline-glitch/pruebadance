@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Магический концерт — Оксана Чанилова</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Playfair+Display:wght@400;700&family=Montserrat:wght@300;400;600&display=swap" rel="stylesheet">
+  <link rel="icon" href="media/artist_icon.jpg">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            gold: '#d4af37',
+            btn: '#c9a050',
+            box: '#8b6b3d',
+          },
+          fontFamily: {
+            serif: ['Cinzel', 'Playfair Display', 'serif'],
+            sans: ['Montserrat', 'Helvetica', 'sans-serif'],
+          },
+        },
+      },
+    }
+  </script>
+  <style>
+    /* Текстура бархата / старинной бумаги */
+    .velvet {
+      background-image:
+        radial-gradient(rgba(212,175,55,0.05) 1px, transparent 1px),
+        radial-gradient(rgba(0,0,0,0.5) 1px, transparent 1px);
+      background-size: 4px 4px, 7px 7px;
+      background-position: 0 0, 2px 3px;
+    }
+    .gold-glow { text-shadow: 0 0 12px rgba(212,175,55,.7), 0 0 30px rgba(212,175,55,.35); }
+    .gold-box-glow { box-shadow: 0 0 18px rgba(212,175,55,.35), inset 0 0 22px rgba(139,107,61,.25); }
+
+    /* Фоновое видео «Deep Longing» — самый задний слой, видно на 100% */
+    #bg_video {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      z-index: -2;
+      pointer-events: none;
+    }
+
+    /* ——— 3D-карусель «Элементы силы»: барабан из 13 карточек ——— */
+    .carousel-3d {
+      position: relative;
+      width: 100%;
+      height: 610px; /* центральная карточка (≈564px в перспективе) целиком в сцене */
+      perspective: 1200px;
+      perspective-origin: 50% 50%;
+    }
+    /* стрелки — строго поверх сцены: карточки их не перекрывают,
+       обводка цела, клик попадает в кнопку, а не в карточку */
+    #carousel_prev,
+    #carousel_next {
+      position: relative;
+      z-index: 20;
+    }
+    .carousel {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      transform-style: preserve-3d;
+      transition: transform .8s ease-in-out;
+    }
+    .card {
+      --card-w: 260px;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: var(--card-w);
+      box-sizing: border-box;
+      padding: 22px 22px 24px;
+      text-align: center;
+      border-radius: 16px;
+      border: 1px solid #8b6b3d;
+      background: #0a0a0a;
+      backface-visibility: hidden;
+      -webkit-user-select: none;
+      user-select: none;
+      cursor: pointer;
+      transition: border-color .5s ease, box-shadow .5s ease, background-color .5s ease;
+    }
+    /* Затемнение неактивных карточек — подложкой, а НЕ filter:
+       filter внутри3D-контейнера даёт в Chrome смещение слоёв
+       (видео «уезжает» из бокса, тёмная полоса поверх рамки) */
+    .card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: rgba(0, 0, 0, .6);
+      opacity: 1;
+      transition: opacity .5s ease;
+      pointer-events: none;
+    }
+    .card.active::after { opacity: 0; }
+    .card.active {
+      border: 4px solid #d4af37;
+      background: #1a1510;
+      box-shadow: 0 0 44px rgba(212,175,55,.4), inset 0 0 22px rgba(139,107,61,.25);
+    }
+    .card-box {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      margin: 0 0 14px;
+      border-radius: 12px;
+      overflow: hidden;
+      /* фон прозрачный: сквозь плашку видно фоновое видео Shift In Mood,
+         растянутое на всё поле карточки */
+    }
+    .card-box video {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      object-fit: contain;
+      transform: translateZ(0); /* свой слой: текстура видео не смещается внутри3D-карточки */
+      pointer-events: none; /* клик ловит карточка */
+    }
+    /* Фон «Shift In Mood» — на ВСЁ поле карточки, плотно до контура:
+       inset:0 упирается во внутреннюю кромку рамки (border), радиус =
+       радиус карточки минус ширина рамки — углы не залезают на золотой бортик */
+    .card .card-bg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 15px;   /* 16px карточки минус 1px её рамки */
+      z-index: -1;           /* выше фона карточки, ниже её содержимого */
+      transform: translateZ(0); /* свой слой: фон лежит ровно внутри 3D-карточки */
+      pointer-events: none;
+    }
+    .card.active .card-bg { border-radius: 12px; } /* 16px минус 4px активной рамки */
+    .card-num {
+      font-family: 'Cinzel', 'Playfair Display', serif;
+      font-size: 18px;
+      letter-spacing: .18em;
+      color: #fff;
+    }
+    .card.active .card-num {
+      font-size: 22px;
+      color: #d4af37;
+      text-shadow: 0 0 12px rgba(212,175,55,.7), 0 0 30px rgba(212,175,55,.35);
+    }
+    @media (max-width: 767px) {
+      .carousel-3d { height: 420px; }
+      .card { --card-w: 200px; padding: 14px 14px 18px; }
+      .card-num { font-size: 15px; }
+      .card.active .card-num { font-size: 18px; }
+    }
+
+    /* ——— Защита видео от скачивания ——— */
+    video {
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    /* ——— Плеер ——— */
+    #player {
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, .96);
+      padding: 16px;
+    }
+    #player.open { display: flex; }
+    #player_frame {
+      position: relative;
+      width: 100%;
+      max-width: 1100px;
+      overflow: hidden;      /* фон не выходит за контур */
+      border-radius: 12px;
+    }
+    #player_video {
+      display: block;
+      position: relative;   /* поверх фонового видео #player_bg */
+      z-index: 1;
+      width: 100%;
+      height: auto;
+      max-height: 78vh;
+      background: transparent; /* бары вокруг видео = фон «Shift In Mood» */
+      border: 2px solid #d4af37;
+      border-radius: 12px;
+      box-shadow: 0 0 40px rgba(212,175,55,.35);
+    }
+    /* Фон «Shift In Mood» за видео плеера — строго внутри золотого контура */
+    #player_bg {
+      position: absolute;
+      left: 2px;
+      top: 2px;
+      width: calc(100% - 4px);
+      height: calc(100% - 4px);  /* поле = бокс кадра строго внутри золотой рамки 2px:
+                                    чёрные поля вырезаны из всех файлов (ffmpeg crop),
+                                    фон плотно закрывает пространство под видео */
+      object-fit: cover;
+      border-radius: 10px;
+      z-index: 0;
+      pointer-events: none;
+    }
+    #player_num {
+      position: absolute;
+      top: 12px;
+      left: 16px;
+      z-index: 2;
+      font-family: 'Cinzel', serif;
+      font-size: 18px;
+      letter-spacing: .2em;
+      color: #d4af37;
+      text-shadow: 0 0 12px rgba(212,175,55,.7);
+      pointer-events: none;
+    }
+    #player_btns {
+      position: absolute;
+      top: 10px;
+      right: 14px;
+      z-index: 2;
+      display: flex;
+      gap: 10px;
+    }
+    .player-btn {
+      height: 40px;
+      padding: 0 16px;
+      border-radius: 999px;
+      border: 2px solid #d4af37;
+      background: rgba(0,0,0,.65);
+      color: #d4af37;
+      font-size: 13px;
+      letter-spacing: .12em;
+      cursor: pointer;
+      transition: transform .3s, background-color .3s;
+    }
+    .player-btn:hover { transform: scale(1.06); background: rgba(0,0,0,.9); }
+
+    /* Горизонтальное положение экрана — видео во весь экран смартфона */
+    @media (orientation: landscape) and (pointer: coarse) {
+      #player { padding: 0; }
+      #player_frame {
+        max-width: none;
+        width: 100vw;
+        height: 100vh;
+        height: 100dvh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      #player_video {
+        width: 100vw;
+        height: 100vh;
+        height: 100dvh;
+        max-height: none;
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+        object-fit: contain;
+      }
+    }
+  </style>
+</head>
+<body class="bg-[#0a0a0a] text-white font-sans antialiased overflow-x-hidden">
+
+  <!-- 0. ФОНОВОЕ ВИДЕО (самый задний слой) -->
+  <video id="bg_video" autoplay muted loop playsinline preload="auto"
+         src="media/Deep%20Longing.mp4"></video>
+
+  <!-- 1. HEADER / HERO -->
+  <section id="header_hero" class="relative overflow-hidden velvet">
+    <!-- Золотые всполохи и силуэты (фон) -->
+    <div class="pointer-events-none absolute inset-0"
+         style="background: radial-gradient(ellipse at 50% 20%, rgba(212,175,55,.28), transparent 60%), radial-gradient(ellipse at 10% 80%, rgba(212,175,55,.15), transparent 50%), radial-gradient(ellipse at 90% 70%, rgba(212,175,55,.15), transparent 50%);"></div>
+    <!-- Фон: мистический лес, звездное небо, свечи, силуэт храма -->
+    <!-- Вставьте сюда фоновое изображение: mystic_forest_starry_sky_candles_temple_silhouette.jpg -->
+
+    <div class="relative mx-auto max-w-6xl px-4 pt-10 pb-4 flex flex-col items-center text-center">
+      <!-- Логотип -->
+      <div class="flex flex-col items-center">
+        <!-- Вставьте сюда логотип-печать (магическая печать / вензель) -->
+        <div class="w-16 h-16 rounded-full border-2 border-[#8b6b3d] gold-box-glow flex items-center justify-center text-gold text-2xl font-serif">✦</div>
+      </div>
+
+      <h1 class="mt-3 w-full max-w-4xl">
+        <img src="media/chanilova_logo_crop.png" alt="Oksana Chanilova — Магический концерт" class="w-full select-none" draggable="false">
+      </h1>
+
+      <!-- Видео-плеер -->
+      <div class="relative mt-4 w-full max-w-4xl aspect-video rounded-2xl border-4 border-gold gold-box-glow overflow-hidden bg-[#0f0c08]">
+        <!-- Вставьте сюда фото Оксаны в образе жрицы/ведьмы -->
+        <img src="media/glavnoe-foto.jpg" alt="Оксана Чанилова" class="absolute inset-0 w-full h-full object-cover">
+        <div class="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent hidden md:block"></div>
+
+        <div class="absolute inset-0 hidden md:flex flex-col items-center justify-end pb-8 px-6 text-center">
+          <p class="max-w-xl font-serif italic text-white text-base md:text-lg leading-relaxed">
+            Оксана Чанилова — проводник в мир женской интуиции. Готовы ли вы услышать зов своей души?
+          </p>
+          <button class="mt-6 inline-flex items-center gap-2 px-6 py-2.5 rounded-full border-2 border-gold text-gold font-serif tracking-widest text-sm bg-black/40 hover:scale-105 transition-all duration-300 gold-box-glow">
+            <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gold text-black text-[10px]">▶</span>
+            ОТКРЫТЬ ПОРТАЛ
+          </button>
+        </div>
+      </div>
+
+      <!-- Мобильная версия: текст и кнопка — под окном, чтобы не перекрывали фото -->
+      <div class="md:hidden mt-4 flex flex-col items-center text-center px-2">
+        <p class="max-w-xl font-serif italic text-white text-sm leading-relaxed">
+          Оксана Чанилова — проводник в мир женской интуиции. Готовы ли вы услышать зов своей души?
+        </p>
+        <button class="mt-4 inline-flex items-center gap-2 px-6 py-2.5 rounded-full border-2 border-gold text-gold font-serif tracking-widest text-sm bg-black/40 hover:scale-105 transition-all duration-300 gold-box-glow">
+          <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gold text-black text-[10px]">▶</span>
+          ОТКРЫТЬ ПОРТАЛ
+        </button>
+      </div>
+
+      <!-- Артефакт под видео -->
+      <div class="mt-8 flex flex-col items-center">
+        <!-- Вставьте сюда фото артефакта (амулет, пентаграмма или кристалл) -->
+        <img src="https://via.placeholder.com/120x120/0f0c08/d4af37?text=Artifact" alt="Артефакт Силы" class="w-24 h-24 rounded-full border-2 border-box gold-box-glow object-cover">
+        <span class="mt-2 font-serif text-xs tracking-widest text-[#a0a0a0]">Артефакт Силы</span>
+      </div>
+
+      <!-- Соцсети (справа внизу hero) -->
+      <div class="mt-10 flex justify-end w-full gap-3">
+        <a href="#" aria-label="Facebook" class="w-9 h-9 rounded-full border border-box text-gold flex items-center justify-center hover:scale-105 transition-all duration-300 gold-box-glow font-bold">f</a>
+        <a href="#" aria-label="Twitter" class="w-9 h-9 rounded-full border border-box text-gold flex items-center justify-center hover:scale-105 transition-all duration-300 gold-box-glow font-bold">t</a>
+        <a href="#" aria-label="Instagram" class="w-9 h-9 rounded-full border border-box text-gold flex items-center justify-center hover:scale-105 transition-all duration-300 gold-box-glow font-bold">ig</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. QUIZ -->
+  <section id="quiz_section" class="py-[60px] px-4">
+    <div class="mx-auto max-w-5xl text-center">
+      <p class="font-serif text-gold gold-glow tracking-[0.25em] uppercase text-lg md:text-xl leading-loose whitespace-pre-line">ОТКРОЙТЕ СВОЮ СУТЬ
+И ОТВЕТЬТЕ НА ВОПРОС СУДЬБЫ:</p>
+
+      <div class="mt-5">
+        <button class="inline-flex items-center gap-2 px-8 py-3 rounded-full bg-btn text-black font-sans font-semibold tracking-widest text-sm shadow-[0_0_20px_rgba(212,175,55,.45)] hover:scale-105 transition-all duration-300">
+          <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-black text-btn text-[10px]">▶</span>
+          ПРОЙТИ ИНИЦИАЦИЮ
+        </button>
+      </div>
+
+      <p class="mt-10 mb-8 font-serif text-white text-lg md:text-xl">Что является главным источником женской силы?</p>
+
+      <!-- Карточки 3 колонки -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <!-- Карточка A -->
+        <div class="relative rounded-2xl border-[5px] border-gold bg-gradient-to-b from-[#1a1510] to-[#0f0c08] gold-box-glow p-8 pb-20 min-h-[260px] flex flex-col items-center">
+          <h3 class="font-serif text-2xl text-gold gold-glow">Луна</h3>
+          <p class="mt-4 font-sans text-sm text-[#a0a0a0]">Интуиция и тайные знания</p>
+          <div class="absolute bottom-6 left-1/2 -translate-x-1/2 w-12 h-12 rounded-full border-2 border-gold flex items-center justify-center font-serif text-gold text-lg gold-glow">А</div>
+        </div>
+        <!-- Карточка B -->
+        <div class="relative rounded-2xl border-[5px] border-gold bg-gradient-to-b from-[#1a1510] to-[#0f0c08] gold-box-glow p-8 pb-20 min-h-[260px] flex flex-col items-center">
+          <h3 class="font-serif text-2xl text-gold gold-glow">Свеча</h3>
+          <p class="mt-4 font-sans text-sm text-[#a0a0a0]">Огонь страсти и трансформации</p>
+          <div class="absolute bottom-6 left-1/2 -translate-x-1/2 w-12 h-12 rounded-full border-2 border-gold flex items-center justify-center font-serif text-gold text-lg gold-glow">В</div>
+        </div>
+        <!-- Карточка C -->
+        <div class="relative rounded-2xl border-[5px] border-gold bg-gradient-to-b from-[#1a1510] to-[#0f0c08] gold-box-glow p-8 pb-20 min-h-[260px] flex flex-col items-center">
+          <h3 class="font-serif text-2xl text-gold gold-glow">Кристалл</h3>
+          <p class="mt-4 font-sans text-sm text-[#a0a0a0]">Твердость духа и ясность мысли</p>
+          <div class="absolute bottom-6 left-1/2 -translate-x-1/2 w-12 h-12 rounded-full border-2 border-gold flex items-center justify-center font-serif text-gold text-lg gold-glow">С</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. ELEMENTS OF POWER / CAROUSEL -->
+  <section id="prizes_section" class="py-16 px-4">
+    <h2 class="text-center font-serif text-3xl md:text-4xl text-gold gold-glow tracking-[0.2em] mb-12">ЭЛЕМЕНТЫ СИЛЫ</h2>
+
+    <div class="mx-auto max-w-6xl flex items-center justify-center gap-4 md:gap-8">
+      <!-- Стрелка влево -->
+      <button id="carousel_prev" class="prev shrink-0 w-12 h-12 rounded-full border-2 border-gold text-gold font-bold bg-black/50 gold-box-glow hover:scale-105 transition-all duration-300" aria-label="Назад">&#8592;</button>
+
+      <!-- Сцена 3D-барабана: 13 карточек стоят по кругу -->
+      <div class="carousel-3d">
+        <div id="carousel" class="carousel"><!-- карточки создаёт скрипт --></div>
+      </div>
+
+      <!-- Стрелка вправо -->
+      <button id="carousel_next" class="next shrink-0 w-12 h-12 rounded-full border-2 border-gold text-gold font-bold bg-black/50 gold-box-glow hover:scale-105 transition-all duration-300" aria-label="Вперёд">&#8594;</button>
+    </div>
+  </section>
+
+  <!-- 4. HOW IT WORKS -->
+  <section id="how_it_works" class="py-16 px-4">
+    <h2 class="text-center font-serif text-3xl md:text-4xl text-gold gold-glow tracking-[0.2em] mb-12">КАК ПРОЙДЕТ МАГИЯ</h2>
+
+    <ol class="mx-auto max-w-5xl grid grid-cols-1 md:grid-cols-2 gap-x-16 gap-y-8">
+      <li class="flex gap-4 items-start">
+        <span class="font-serif text-3xl text-gold gold-glow shrink-0">1.</span>
+        <p class="text-white/90 leading-relaxed"><span class="font-semibold text-gold">Очищение пространства:</span> Вход в зал, где каждая деталь имеет значение.</p>
+      </li>
+      <li class="flex gap-4 items-start">
+        <span class="font-serif text-3xl text-gold gold-glow shrink-0">2.</span>
+        <p class="text-white/90 leading-relaxed"><span class="font-semibold text-gold">Пробуждение силы:</span> Оксана проведет вас через практики активации женской энергии.</p>
+      </li>
+      <li class="flex gap-4 items-start">
+        <span class="font-serif text-3xl text-gold gold-glow shrink-0">3.</span>
+        <p class="text-white/90 leading-relaxed"><span class="font-semibold text-gold">Голосовой ритуал:</span> Уникальное исполнение мантр и песен, написанных специально для этого вечера.</p>
+      </li>
+      <li class="flex gap-4 items-start">
+        <span class="font-serif text-3xl text-gold gold-glow shrink-0">4.</span>
+        <p class="text-white/90 leading-relaxed"><span class="font-semibold text-gold">Сакральный диалог:</span> Ответы на вопросы, которые волнуют вашу душу (разговор с залом).</p>
+      </li>
+      <li class="flex gap-4 items-start md:col-span-1">
+        <span class="font-serif text-3xl text-gold gold-glow shrink-0">5.</span>
+        <p class="text-white/90 leading-relaxed"><span class="font-semibold text-gold">Артефакт на память:</span> Каждый гость получает заряд энергии и магический подарок.</p>
+      </li>
+    </ol>
+  </section>
+
+  <!-- 5. FOOTER -->
+  <footer id="footer" class="py-10 px-6 border-t border-box/40">
+    <div class="mx-auto max-w-6xl grid grid-cols-1 md:grid-cols-3 items-center gap-6">
+      <nav class="flex flex-wrap justify-center md:justify-start gap-x-4 gap-y-2 text-[11px] tracking-widest text-[#a0a0a0] uppercase">
+        <a href="#" class="hover:text-gold transition-all duration-300">РЕГИСТРАЦИЯ</a>
+        <span>|</span>
+        <a href="#" class="hover:text-gold transition-all duration-300">ПОЛИТИКА КОНФИДЕНЦИАЛЬНОСТИ</a>
+        <span>|</span>
+        <a href="#" class="hover:text-gold transition-all duration-300">КОНТАКТЫ</a>
+      </nav>
+
+      <!-- Логотип-печать по центру -->
+      <div class="flex justify-center">
+        <!-- Вставьте сюда логотип Оксаны Чаниловой (магическая печать или вензель) -->
+        <div class="w-14 h-14 rounded-full border border-box gold-box-glow flex items-center justify-center text-gold font-serif">✦</div>
+      </div>
+
+      <div class="flex justify-center md:justify-end gap-3">
+        <a href="#" aria-label="Facebook" class="w-8 h-8 rounded-full border border-gold text-gold flex items-center justify-center text-xs font-bold hover:scale-105 transition-all duration-300">f</a>
+        <a href="#" aria-label="Twitter" class="w-8 h-8 rounded-full border border-gold text-gold flex items-center justify-center text-xs font-bold hover:scale-105 transition-all duration-300">t</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ПЛЕЕР: открывается по нажатию на видео -->
+  <div id="player" aria-hidden="true">
+    <div id="player_frame">
+      <video id="player_bg" src="media/Shift%20In%20Mood.mp4" muted loop playsinline
+             preload="metadata" controlslist="nodownload" draggable="false" aria-hidden="true"></video>
+      <span id="player_num">01</span>
+      <div id="player_btns">
+        <button id="player_rotate" class="player-btn" type="button" title="Повернуть экран горизонтально">⟳ ГОРИЗОНТАЛЬНО</button>
+        <button id="player_close" class="player-btn" type="button" title="Закрыть">✕</button>
+      </div>
+      <video id="player_video" controls playsinline preload="metadata" controlslist="nodownload" draggable="false"></video>
+    </div>
+  </div>
+
+  <script>
+    /* «ЭЛЕМЕНТЫ СИЛЫ» — карусель из 12 видео (480×320) с горизонтальным
+       прокручиванием плашек, плеером, поворотом экрана и защитой от скачивания */
+    (function () {
+      var TOTAL = 13;
+
+      function pad(n) { return 10 > n ? '0' + n : '' + n; }
+      function playSafe(v) { if (v) { var p = v.play(); if (p && p.catch) p.catch(function () {}); } }
+
+      var scene = document.querySelector('.carousel-3d');
+      var carousel = document.getElementById('carousel');
+      var btnPrev = document.getElementById('carousel_prev');
+      var btnNext = document.getElementById('carousel_next');
+      var player = document.getElementById('player');
+      var playerVideo = document.getElementById('player_video');
+      var playerBg = document.getElementById('player_bg');
+      var playerNum = document.getElementById('player_num');
+      var btnClose = document.getElementById('player_close');
+      var btnRotate = document.getElementById('player_rotate');
+      if (!scene || !carousel || !btnPrev || !btnNext) return;
+
+      var angle = 360 / TOTAL; /* угол между карточками = 360 / 13 */
+      var rotation = 0;        /* текущий поворот барабана */
+      var activeIdx = -1;
+      var animating = false;
+      var playerOpen = false;
+      var swiped = false;
+
+      /* 13 карточек: видео + номер */
+      var cards = [];
+      for (var i = 1; i <= TOTAL; i++) cards.push(makeCard(i));
+
+      function makeCard(n) {
+        var el = document.createElement('div');
+        el.className = 'card';
+        el.innerHTML =
+          /* фон «Shift In Mood» — на всё поле карточки, до самого контура */
+          '<video class="card-bg" src="media/Shift%20In%20Mood.mp4" muted loop playsinline ' +
+                 'preload="metadata" controlslist="nodownload" draggable="false"></video>' +
+          '<div class="card-box">' +
+            '<video class="card-video" src="media/songs/' + pad(n) + '.mp4" muted loop playsinline ' +
+                   'preload="metadata" controlslist="nodownload" draggable="false"></video>' +
+          '</div>' +
+          '<div class="card-num">' + pad(n) + '</div>';
+        carousel.appendChild(el);
+        el.addEventListener('click', function () {
+          if (swiped) return;
+          /* открывается только фронтальная (активная) карточка */
+          if (!el.classList.contains('active')) return;
+          openPlayer(n);
+        });
+        return { el: el, video: el.querySelector('.card-video'), bg: el.querySelector('.card-bg'), n: n };
+      }
+
+      /* ——— расстановка карточек по кругу ——— */
+      /* радиус подобран как cardW / (2·sin(π/13)) — карточки не пересекаются */
+      function layout() {
+        var cardW = cards[0].el.offsetWidth || 260;
+        var radius = Math.round(cardW / (2 * Math.sin(Math.PI / TOTAL)));
+        cards.forEach(function (c, idx) {
+          c.el.style.transform =
+            'translate(-50%, -50%) rotateY(' + (idx * angle) + 'deg) translateZ(' + radius + 'px)';
+        });
+      }
+
+      function afterTransition(cb) {
+        var done = false;
+        function finish() {
+          if (done) return;
+          done = true;
+          carousel.removeEventListener('transitionend', onEnd);
+          window.clearTimeout(timer);
+          cb();
+        }
+        function onEnd(e) { if (e.target === carousel) finish(); }
+        carousel.addEventListener('transitionend', onEnd);
+        var timer = window.setTimeout(finish, 1000);
+      }
+
+      function showFrame(v) {
+        if (v.dataset.framed === '1') return;
+        v.dataset.framed = '1';
+        var seek = function () { try { v.currentTime = 0.1; } catch (e) {} };
+        if (v.readyState >= 1) seek();
+        else v.addEventListener('loadedmetadata', seek, { once: true });
+      }
+
+      /* активная карточка — яркая, с золотой рамкой и играющим видео;
+         остальные затемнены (brightness .5) и стоят на паузе */
+      function syncMedia() {
+        cards.forEach(function (c, idx) {
+          var isActive = (idx === activeIdx);
+          c.el.classList.toggle('active', isActive);
+          if (isActive) {
+            showFrame(c.video);
+            if (!playerOpen) playSafe(c.video);
+          } else {
+            c.video.pause();
+            showFrame(c.video);
+          }
+          /* фон «Shift In Mood» за видео: играет только в активной плашке,
+             в остальных — статичный первый кадр (экономия CPU) */
+          if (c.bg) {
+            showFrame(c.bg);
+            if (isActive && !playerOpen) playSafe(c.bg);
+            else c.bg.pause();
+          }
+        });
+      }
+
+      /* какая карточка сейчас спереди (по повороту барабана) */
+      function updateActive() {
+        var idx = ((Math.round(-rotation / angle) % TOTAL) + TOTAL) % TOTAL;
+        if (idx !== activeIdx) {
+          activeIdx = idx;
+          syncMedia();
+        }
+      }
+
+      /* проворот барабана: .next — на угол вперёд, .prev — назад.
+         Цикл бесконечный: поворот только накапливается, лента не «перепрыгивает» */
+      function go(dir) {
+        if (animating || playerOpen) return;
+        animating = true;
+        rotation -= dir * angle; /* .next — поворот на «минус угол» */
+        carousel.style.transform = 'rotateY(' + rotation + 'deg)';
+        afterTransition(function () {
+          updateActive();
+          animating = false;
+        });
+      }
+
+      btnNext.addEventListener('click', function () { go(1); });
+      btnPrev.addEventListener('click', function () { go(-1); });
+
+      /* свайп пальцем влево/вправо */
+      var touchX = null, touchY = null;
+      scene.addEventListener('touchstart', function (e) {
+        if (e.touches.length !== 1) { touchX = null; return; }
+        touchX = e.touches[0].clientX;
+        touchY = e.touches[0].clientY;
+        swiped = false;
+      }, { passive: true });
+      scene.addEventListener('touchend', function (e) {
+        if (touchX === null) return;
+        var dx = e.changedTouches[0].clientX - touchX;
+        var dy = e.changedTouches[0].clientY - touchY;
+        touchX = null;
+        if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
+          swiped = true;
+          go(0 > dx ? 1 : -1);
+          window.setTimeout(function () { swiped = false; }, 400);
+        }
+      }, { passive: true });
+
+      /* ——— плеер ——— */
+      function pauseEverything() {
+        cards.forEach(function (c) { c.video.pause(); if (c.bg) c.bg.pause(); });
+        var bg = document.getElementById('bg_video');
+        if (bg) bg.pause();
+      }
+
+      function openPlayer(n) {
+        if (!player || playerOpen) return;
+        playerOpen = true;
+        playerNum.textContent = pad(n);
+        playerVideo.src = 'media/songs/' + pad(n) + '.mp4';
+        player.classList.add('open');
+        player.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+        playerVideo.muted = false;
+        var pr = playerVideo.play();
+        if (pr && pr.catch) pr.catch(function () {
+          /* если браузер не разрешил звук — играем без звука, звук включается в плеере */
+          playerVideo.muted = true;
+          playSafe(playerVideo);
+        });
+        pauseEverything();
+        playSafe(playerBg);
+      }
+
+      function closePlayer() {
+        if (!playerOpen) return;
+        playerOpen = false;
+        player.classList.remove('open');
+        player.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+        playerVideo.pause();
+        if (playerBg) playerBg.pause();
+        playerVideo.removeAttribute('src');
+        playerVideo.load();
+        exitLandscape();
+        playSafe(document.getElementById('bg_video'));
+        syncMedia();
+      }
+
+      function lockLandscape() {
+        try {
+          var o = window.screen.orientation;
+          if (o && o.lock) { var lp = o.lock('landscape'); if (lp && lp.catch) lp.catch(function () {}); }
+        } catch (e) {}
+      }
+
+      function exitLandscape() {
+        try {
+          var o = window.screen.orientation;
+          if (o && o.unlock) o.unlock();
+        } catch (e) {}
+        try { if (document.fullscreenElement) document.exitFullscreen(); } catch (e) {}
+      }
+
+      function enterLandscape() {
+        /* iOS — нативный полноэкранный плеер */
+        if (playerVideo && playerVideo.webkitEnterFullscreen) {
+          try { playerVideo.webkitEnterFullscreen(); return; } catch (e) {}
+        }
+        var frame = document.getElementById('player_frame');
+        if (frame && frame.requestFullscreen) {
+          var pr = frame.requestFullscreen();
+          if (pr && pr.then) pr.then(lockLandscape).catch(function () {});
+        }
+      }
+
+      if (btnClose) btnClose.addEventListener('click', closePlayer);
+      if (btnRotate) {
+        btnRotate.addEventListener('click', function () {
+          if (document.fullscreenElement) exitLandscape();
+          else enterLandscape();
+        });
+      }
+      if (player) {
+        player.addEventListener('click', function (e) {
+          if (e.target === player) closePlayer();
+        });
+      }
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && playerOpen) closePlayer();
+      });
+
+      /* поворот экрана: горизонтально — видео во весь экран, вертикально — как было */
+      function onOrientation() {
+        if (!playerOpen) return;
+        var landscape = window.matchMedia('(orientation: landscape)').matches;
+        if (!landscape) exitLandscape();
+      }
+
+      var resizeTimer = null;
+      function onResize() {
+        onOrientation();
+        if (resizeTimer) window.clearTimeout(resizeTimer);
+        resizeTimer = window.setTimeout(function () { layout(); }, 100);
+      }
+      window.addEventListener('resize', onResize);
+      window.addEventListener('orientationchange', onResize);
+
+      /* ——— защита от скачивания ——— */
+      document.addEventListener('contextmenu', function (e) {
+        var t = e.target;
+        if (t && t.tagName === 'VIDEO') e.preventDefault();
+      });
+      document.addEventListener('dragstart', function (e) {
+        var t = e.target;
+        if (t && t.tagName === 'VIDEO') e.preventDefault();
+      });
+
+      /* вкладку скрывали — возвращаем видео */
+      document.addEventListener('visibilitychange', function () {
+        if (document.hidden || playerOpen) return;
+        playSafe(document.getElementById('bg_video'));
+        if (cards[activeIdx]) playSafe(cards[activeIdx].video);
+        if (cards[activeIdx] && cards[activeIdx].bg) playSafe(cards[activeIdx].bg);
+      });
+
+      layout();
+      updateActive();
+    })();
+  </script>
+
+  <!-- ===== ПРЕМИУМ-СЛОЙ: плавный скролл · появления · скраб · параллакс · курсор ===== -->
+  <style>
+    html.lenis, html.lenis body { height: auto; }
+    .lenis.lenis-smooth { scroll-behavior: auto !important; }
+    .lenis.lenis-stopped { overflow: hidden; }
+    .js-reveal { opacity: 0; transform: translateY(34px); transition: opacity .95s ease, transform .95s cubic-bezier(.22,.61,.36,1); }
+    .js-reveal.js-shown { opacity: 1; transform: none; }
+    .ui-dot, .ui-ring { position: fixed; top: 0; left: 0; pointer-events: none; z-index: 200; border-radius: 50%; will-change: transform; }
+    .ui-dot { width: 6px; height: 6px; margin: -3px 0 0 -3px; background: #d4af37; box-shadow: 0 0 10px rgba(212,175,55,.9); }
+    .ui-ring { width: 38px; height: 38px; margin: -19px 0 0 -19px; border: 1px solid rgba(212,175,55,.6); transition: width .25s ease, height .25s ease, margin .25s ease, opacity .3s ease, border-color .25s ease; }
+    .ui-ring.is-on { width: 58px; height: 58px; margin: -29px 0 0 -29px; border-color: rgba(212,175,55,.95); }
+    .ui-ring.is-off, .ui-dot.is-off { opacity: 0; }
+    @media (prefers-reduced-motion: reduce) {
+      .js-reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
+    }
+  </style>
+  <script src="media/js/lenis.min.js"></script>
+  <script src="media/js/gsap.min.js"></script>
+  <script src="media/js/ScrollTrigger.min.js"></script>
+  <script>
+    /* ===== Премиум-слой анимаций =====
+       Только украшения скролла: логика карусели и плеера не тронута. */
+    (function () {
+      var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      var fine = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+      var hasG = (typeof gsap !== 'undefined');
+      var hasL = (typeof Lenis !== 'undefined');
+      var lenis = null;
+
+      /* ——— 1. Плавный скролл (Lenis) ——— */
+      if (hasL && !reduce) {
+        lenis = new Lenis({ duration: 1.15, smoothWheel: true, touchMultiplier: 1.5 });
+        if (hasG) {
+          gsap.registerPlugin(ScrollTrigger);
+          lenis.on('scroll', ScrollTrigger.update);
+          gsap.ticker.add(function (t) { lenis.raf(t * 1000); });
+          gsap.ticker.lagSmoothing(0);
+        } else {
+          (function raf(time) { lenis.raf(time); requestAnimationFrame(raf); })(0);
+        }
+        /* пока открыт плеер — скролл страницы остановлен */
+        var playerEl = document.getElementById('player');
+        if (playerEl && 'MutationObserver' in window) {
+          new MutationObserver(function () {
+            if (playerEl.classList.contains('open')) { lenis.stop(); } else { lenis.start(); }
+          }).observe(playerEl, { attributes: true, attributeFilter: ['class'] });
+        }
+      } else if (hasG) {
+        gsap.registerPlugin(ScrollTrigger);
+      }
+
+      /* ——— 2. Появление блоков (fade + slide up, со стаггером) ——— */
+      if (!reduce) {
+        (function () {
+          function kids(el) {
+            var out = [];
+            var ch = el.children;
+            for (var i = 0; ch.length > i; i++) { out.push(ch[i]); }
+            return out;
+          }
+          var groups = [];
+          var hero = document.querySelector('section');
+          if (hero) { var hb = hero.querySelector('div.relative'); if (hb) groups.push(kids(hb)); }
+          var quiz = document.getElementById('quiz_section');
+          if (quiz) { var qb = quiz.querySelector('div'); if (qb) { groups.push(kids(qb)); var grid = qb.querySelector('.grid'); if (grid) groups.push(kids(grid)); } }
+          var prizes = document.getElementById('prizes_section');
+          if (prizes) groups.push(kids(prizes));
+          var how = document.getElementById('how_it_works');
+          if (how) { groups.push(kids(how)); var ol = how.querySelector('ol'); if (ol) groups.push(kids(ol)); }
+          var foot = document.getElementById('footer');
+          if (foot) { var fb = foot.querySelector('div'); if (fb) groups.push(kids(fb)); }
+          var list = [];
+          groups.forEach(function (els) {
+            els.forEach(function (el, idx) {
+              if (!el || !el.classList) return;
+              el.classList.add('js-reveal');
+              el.style.transitionDelay = (Math.min(idx, 6) * 90) + 'ms';
+              list.push(el);
+            });
+          });
+          if (!('IntersectionObserver' in window)) {
+            for (var j = 0; list.length > j; j++) { list[j].classList.add('js-shown'); }
+            return;
+          }
+          var io = new IntersectionObserver(function (entries) {
+            entries.forEach(function (en) {
+              if (!en.isIntersecting) return;
+              en.target.classList.add('js-shown');
+              io.unobserve(en.target);
+            });
+          }, { threshold: 0.12, rootMargin: '0px 0px -6% 0px' });
+          for (var k = 0; list.length > k; k++) { io.observe(list[k]); }
+        })();
+      }
+
+      /* ——— 3+4. Скролл-скраб и параллакс (GSAP ScrollTrigger) ——— */
+      if (hasG && !reduce) {
+        var heroSec = document.querySelector('section');
+        var logoImg = document.querySelector('h1 img');
+        var emblem = heroSec ? heroSec.querySelector('div.w-16') : null;
+        var win = document.querySelector('section .aspect-video');
+        var scene = document.querySelector('.carousel-3d');
+        var prizesSec = document.getElementById('prizes_section');
+        var bg = document.getElementById('bg_video');
+
+        /* фон: лёгкий параллакс «дыхания» глубины */
+        if (bg) {
+          gsap.set(bg, { scale: 1.07 });
+          gsap.fromTo(bg, { yPercent: -2.5 }, {
+            yPercent: 2.5, ease: 'none',
+            scrollTrigger: { start: 0, end: 'max', scrub: 1 }
+          });
+        }
+        /* герой: логотип уплывает быстрее, эмблема медленнее — глубина */
+        if (heroSec && logoImg) {
+          gsap.to(logoImg, { yPercent: -16, ease: 'none', scrollTrigger: { trigger: heroSec, start: 'top top', end: 'bottom 30%', scrub: .7 } });
+        }
+        if (heroSec && emblem) {
+          gsap.to(emblem, { yPercent: -40, ease: 'none', scrollTrigger: { trigger: heroSec, start: 'top top', end: 'bottom 30%', scrub: .7 } });
+        }
+        /* окно с фото: мягкий «подъём» кадра */
+        if (win) {
+          gsap.fromTo(win, { scale: .965 }, { scale: 1, ease: 'none', scrollTrigger: { trigger: win, start: 'top 96%', end: 'top 55%', scrub: .6 } });
+        }
+        /* барабан: сцена кренится ровно настолько, на сколько прокручен экран */
+        if (scene && prizesSec) {
+          gsap.fromTo(scene, { rotateX: 9 }, {
+            rotateX: -9, ease: 'none',
+            scrollTrigger: { trigger: prizesSec, start: 'top bottom', end: 'bottom top', scrub: .8 }
+          });
+        }
+        window.addEventListener('load', function () { ScrollTrigger.refresh(); });
+        var rTimer;
+        window.addEventListener('resize', function () {
+          window.clearTimeout(rTimer);
+          rTimer = window.setTimeout(function () { ScrollTrigger.refresh(); }, 200);
+        });
+      }
+
+      /* ——— 5. Микро-interactions: магнитные кнопки и золотое кольцо-курсор ——— */
+      if (fine && !reduce) {
+        /* магнитные кнопки/ссылки */
+        var magTargets = document.querySelectorAll('button, a[href]');
+        for (var mi = 0; magTargets.length > mi; mi++) {
+          (function (el) {
+            el.addEventListener('mousemove', function (e) {
+              var r = el.getBoundingClientRect();
+              if (!r.width) return;
+              var dx = e.clientX - (r.left + r.width / 2);
+              var dy = e.clientY - (r.top + r.height / 2);
+              el.style.transform = 'translate(' + (dx * 0.22).toFixed(1) + 'px,' + (dy * 0.22).toFixed(1) + 'px) scale(1.05)';
+            });
+            el.addEventListener('mouseleave', function () { el.style.transform = ''; });
+          })(magTargets[mi]);
+        }
+        /* кольцо-курсор с инерцией */
+        var dot = document.createElement('div'); dot.className = 'ui-dot';
+        var ring = document.createElement('div'); ring.className = 'ui-ring';
+        document.body.appendChild(dot);
+        document.body.appendChild(ring);
+        var mx = window.innerWidth / 2, my = window.innerHeight / 2, rx = mx, ry = my;
+        document.addEventListener('mousemove', function (e) {
+          mx = e.clientX; my = e.clientY;
+          dot.style.transform = 'translate(' + mx + 'px,' + my + 'px)';
+          dot.classList.remove('is-off'); ring.classList.remove('is-off');
+        });
+        (function loop() {
+          rx += (mx - rx) * 0.16; ry += (my - ry) * 0.16;
+          ring.style.transform = 'translate(' + rx.toFixed(1) + 'px,' + ry.toFixed(1) + 'px)';
+          requestAnimationFrame(loop);
+        })();
+        document.addEventListener('mouseover', function (e) {
+          var t = e.target;
+          if (t && t.closest && t.closest('a, button, .card')) ring.classList.add('is-on');
+        });
+        document.addEventListener('mouseout', function (e) {
+          var t = e.target;
+          if (t && t.closest && t.closest('a, button, .card')) ring.classList.remove('is-on');
+        });
+        document.addEventListener('mouseleave', function () { ring.classList.add('is-off'); dot.classList.add('is-off'); });
+        document.addEventListener('mouseenter', function () { ring.classList.remove('is-off'); dot.classList.remove('is-off'); });
+      }
+    })();
+  </script>
+
+</body>
+</html>
